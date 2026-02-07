@@ -258,16 +258,25 @@ class CLIPVAD(nn.Module):
         # t_global: [B, D]
         t_global = self.text_proj(text_features_llm)
 
+        # ==================== 视觉注入逻辑 ====================
+
+
+        # 归一化视觉池化向量
+        v_significant_norm = F.normalize(v_global, p=2, dim=-1)
+
+        t_global_injected = t_global + v_significant_norm
+        t_global_refined = t_global_injected + self.mlp1(t_global_injected)
+
         # 5. 特征对齐与归一化
         # 按照论文要求，进行 1:1 的直接对齐
-        v_norm = F.normalize(v_global, p=2, dim=-1)
-        t_norm = F.normalize(t_global, p=2, dim=-1)
+        v_norm = v_significant_norm
+        t_norm = F.normalize(t_global_refined, p=2, dim=-1)
 
         # text_features_ori = self.encode_textprompt(text)
 
         # text_features = text_features_ori
         # logits_attn = logits1.permute(0, 2, 1)
-        # visual_attn = logits_attn @ nn.Sequential
+        # visual_attn = logits_attn @ visual_features
         # visual_attn = visual_attn / visual_attn.norm(dim=-1, keepdim=True)
         # visual_attn = visual_attn.expand(visual_attn.shape[0], text_features_ori.shape[0], visual_attn.shape[2])
         # text_features = text_features_ori.unsqueeze(0)
