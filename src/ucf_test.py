@@ -145,7 +145,7 @@ if __name__ == '__main__':
     label_map = dict({'Normal': 'Normal', 'Abuse': 'Abuse', 'Arrest': 'Arrest', 'Arson': 'Arson', 'Assault': 'Assault', 'Burglary': 'Burglary', 'Explosion': 'Explosion', 'Fighting': 'Fighting', 'RoadAccidents': 'RoadAccidents', 'Robbery': 'Robbery', 'Shooting': 'Shooting', 'Shoplifting': 'Shoplifting', 'Stealing': 'Stealing', 'Vandalism': 'Vandalism'})
 
     # 加载离线 LLM 特征 [14, 4096]
-    class_llm_feats = torch.load("class_llm_feats.pt").to(device)
+    class_llm_feats = torch.load("ucf_class_llm_feats.pt").to(device)
 
     llm_dir = "/home/xuchen/Project/VadCLIP-main-yxl/VadCLIP-new/ucf_video_embeddings"
     testdataset = UCFDataset(args.visual_length, args.test_list, True, None, None, llm_dir)

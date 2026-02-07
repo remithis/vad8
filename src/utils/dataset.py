@@ -114,14 +114,26 @@ class XDDataset(data.Dataset):
 
         # 加载对应的离线 LLM 文本特征 (4096维)
         # 假设 csv 中 path 是 '/path/to/video_name.npy'，我们需要 video_name
-        video_id = os.path.basename(video_path).replace('.npy', '')
-        llm_feat_path = os.path.join(self.llm_dir, video_id + ".pt")
+        # video_id = os.path.basename(video_path).replace('.npy', '')
+        # llm_feat_path = os.path.join(self.llm_dir, video_id + ".pt")
         
-        if self.llm_dir is not None and os.path.exists(llm_feat_path):
-            # 加载并转为 float32
-            llm_text_feat = torch.load(llm_feat_path).float()
-        else:
-            # 如果是测试模式或未找到特征，返回零向量
-            llm_text_feat = torch.zeros(4096)
+        # if self.llm_dir is not None and os.path.exists(llm_feat_path):
+        #     # 加载并转为 float32
+        #     llm_text_feat = torch.load(llm_feat_path).float()
+        # else:
+        #     # 如果是测试模式或未找到特征，返回零向量
+        #     llm_text_feat = torch.zeros(4096)
+        llm_text_feat = torch.zeros(4096)  # 默认初始化为零向量
+        
+        if self.llm_dir is not None:
+            video_id = os.path.basename(video_path).replace('.npy', '')
+            llm_feat_path = os.path.join(self.llm_dir, video_id + ".pt")
+            
+            if os.path.exists(llm_feat_path):
+                llm_text_feat = torch.load(llm_feat_path).float()
+            else:
+                # 打印一个警告，方便调试缺少的特征
+                # print(f"Warning: LLM feature not found at {llm_feat_path}")
+                pass
 
         return clip_feature, clip_label, clip_length, llm_text_feat

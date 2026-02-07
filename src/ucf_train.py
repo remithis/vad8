@@ -136,7 +136,7 @@ def train(model, normal_loader, anomaly_loader, testloader, args, label_map, dev
                 # 取该视频的前 v_len 帧，避免 padding 干扰
                 video_sims = frame_sims[b, :v_len, :] # [T_actual, 14]
                 
-                k = max(1, int(v_len / 16 + 1))
+                k = max(1, int(v_len / 32 + 1))
                 # 在时间维度 (dim=0) 选出每类得分最高的前 k 个
                 topk_sims, _ = torch.topk(video_sims, k=k, dim=0) # [k, 14]
                 
