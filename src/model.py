@@ -236,62 +236,98 @@ class CLIPVAD(nn.Module):
 
         return text_features
 
+    # 无视觉注入，直接对齐
     def forward(self, visual, padding_mask, text_features_llm, lengths):
         """
         visual: [Batch, T, D] 视觉特征
         text_features_llm: [Batch, 4096] 文本特征
         """
-        visual_features = self.encode_video(visual, padding_mask, lengths) # Fv
+        visual_features = self.encode_video(visual, padding_mask, lengths)  # Fv
 
-        # logits1: [B, T, 1]
+
         logits1 = self.classifier(visual_features + self.mlp2(visual_features))
 
-        # 视觉特征全局池化
-        # 利用 logits1 (即时间注意力分数) 对时序特征进行加权求和
-        # 得分越高的片段（越可能是异常的片段）对全局视频特征贡献越大
-        weights = torch.sigmoid(logits1) # [B, T, 1] 归一化到 0-1
-        # V_global: [B, D] 代表整段视频的全局视觉向量
+
+        weights = torch.sigmoid(logits1)  # [B, T, 1] 归一化到 0-1
         v_global = torch.sum(visual_features * weights, dim=1) / (torch.sum(weights, dim=1) + 1e-6)
 
-        # 4. 文本特征投影
-        # 将 4096 维映射到视觉维度 D
-        # t_global: [B, D]
         t_global = self.text_proj(text_features_llm)
 
-        # ==================== 视觉注入逻辑 ====================
 
+        v_norm = F.normalize(v_global, p=2, dim=-1)
+        t_norm = F.normalize(t_global, p=2, dim=-1)
 
-        # 归一化视觉池化向量
-        v_significant_norm = F.normalize(v_global, p=2, dim=-1)
-
-        t_global_injected = t_global + v_significant_norm
-        t_global_refined = t_global_injected + self.mlp1(t_global_injected)
-
-        # 5. 特征对齐与归一化
-        # 按照论文要求，进行 1:1 的直接对齐
-        v_norm = v_significant_norm
-        t_norm = F.normalize(t_global_refined, p=2, dim=-1)
-
-        # text_features_ori = self.encode_textprompt(text)
-
-        # text_features = text_features_ori
-        # logits_attn = logits1.permute(0, 2, 1)
-        # visual_attn = logits_attn @ visual_features
-        # visual_attn = visual_attn / visual_attn.norm(dim=-1, keepdim=True)
-        # visual_attn = visual_attn.expand(visual_attn.shape[0], text_features_ori.shape[0], visual_attn.shape[2])
-        # text_features = text_features_ori.unsqueeze(0)
-        # text_features = text_features.expand(visual_attn.shape[0], text_features.shape[1], text_features.shape[2])
-        # text_features = text_features + visual_attn
-        # text_features = text_features + self.mlp1(text_features)
-
-        # visual_features_norm = visual_features / visual_features.norm(dim=-1, keepdim=True)
-        # text_features_norm = text_features / text_features.norm(dim=-1, keepdim=True)
-        # text_features_norm = text_features_norm.permute(0, 2, 1)
-        # logits2 = (v_norm @ t_norm.T) / 0.07 
         logit_scale = self.logit_scale.exp()
         logits2 = (v_norm @ t_norm.T) * logit_scale
 
         # logits2 = visual_features_norm @ text_features_norm.type(visual_features_norm.dtype) / 0.07
 
         return visual_features, t_norm, logits1, logits2
+
+
+
+
+
+
+
+
+    # # 有视觉注入
+    # def forward(self, visual, padding_mask, text_features_llm, lengths):
+    #     """
+    #     visual: [Batch, T, D] 视觉特征
+    #     text_features_llm: [Batch, 4096] 文本特征
+    #     """
+    #     visual_features = self.encode_video(visual, padding_mask, lengths) # Fv
+
+    #     # logits1: [B, T, 1]
+    #     logits1 = self.classifier(visual_features + self.mlp2(visual_features))
+
+    #     # 视觉特征全局池化
+    #     # 利用 logits1 (即时间注意力分数) 对时序特征进行加权求和
+    #     # 得分越高的片段（越可能是异常的片段）对全局视频特征贡献越大
+    #     weights = torch.sigmoid(logits1) # [B, T, 1] 归一化到 0-1
+    #     # V_global: [B, D] 代表整段视频的全局视觉向量
+    #     v_global = torch.sum(visual_features * weights, dim=1) / (torch.sum(weights, dim=1) + 1e-6)
+
+    #     # 4. 文本特征投影
+    #     # 将 4096 维映射到视觉维度 D
+    #     # t_global: [B, D]
+    #     t_global = self.text_proj(text_features_llm)
+
+    #     # ==================== 视觉注入逻辑 ====================
+
+
+    #     # 归一化视觉池化向量
+    #     v_significant_norm = F.normalize(v_global, p=2, dim=-1)
+
+    #     t_global_injected = t_global + v_significant_norm
+    #     t_global_refined = t_global_injected + self.mlp1(t_global_injected)
+
+    #     # 5. 特征对齐与归一化
+    #     # 按照论文要求，进行 1:1 的直接对齐
+    #     v_norm = v_significant_norm
+    #     t_norm = F.normalize(t_global_refined, p=2, dim=-1)
+
+    #     # text_features_ori = self.encode_textprompt(text)
+
+    #     # text_features = text_features_ori
+    #     # logits_attn = logits1.permute(0, 2, 1)
+    #     # visual_attn = logits_attn @ visual_features
+    #     # visual_attn = visual_attn / visual_attn.norm(dim=-1, keepdim=True)
+    #     # visual_attn = visual_attn.expand(visual_attn.shape[0], text_features_ori.shape[0], visual_attn.shape[2])
+    #     # text_features = text_features_ori.unsqueeze(0)
+    #     # text_features = text_features.expand(visual_attn.shape[0], text_features.shape[1], text_features.shape[2])
+    #     # text_features = text_features + visual_attn
+    #     # text_features = text_features + self.mlp1(text_features)
+
+    #     # visual_features_norm = visual_features / visual_features.norm(dim=-1, keepdim=True)
+    #     # text_features_norm = text_features / text_features.norm(dim=-1, keepdim=True)
+    #     # text_features_norm = text_features_norm.permute(0, 2, 1)
+    #     # logits2 = (v_norm @ t_norm.T) / 0.07 
+    #     logit_scale = self.logit_scale.exp()
+    #     logits2 = (v_norm @ t_norm.T) * logit_scale
+
+    #     # logits2 = visual_features_norm @ text_features_norm.type(visual_features_norm.dtype) / 0.07
+
+    #     return visual_features, t_norm, logits1, logits2
     
